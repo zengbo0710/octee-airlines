@@ -1,3 +1,49 @@
+interface Env {
+  DB: D1Database;
+}
+
+interface InventoryRow {
+  flight_id: string;
+  segment_index: number;
+  capacity: number;
+  reserved: number;
+}
+
+interface FlightRow {
+  id: string;
+  airline: "OA" | "OU" | "SA";
+  flight_no: string;
+  operating_days_json: string;
+  segments_json: string;
+  seat_capacity: number;
+  active: number;
+}
+
+interface AirportRow {
+  code: string;
+  name: string;
+  description: string;
+  aliases_json: string;
+}
+
+interface StatusFlightRow {
+  flight_no: string;
+  airline: "OA" | "OU" | "SA";
+  operating_days_json: string;
+  segments_json: string;
+}
+
+interface ReviewRow {
+  id: string;
+  rating: number;
+  title: string;
+  body: string;
+  route: string | null;
+  verified_flyer: number;
+  created_at: string;
+  username: string;
+}
+
 const SESSION_COOKIE = "octee_session";
 const SESSION_DAYS = 14;
 const PASSWORD_ITERATIONS = 150_000;
@@ -85,7 +131,9 @@ async function readJson(request, maxBytes = 16_384) {
 }
 
 class HttpError extends Error {
-  constructor(message, status = 400) {
+  status: number;
+
+  constructor(message: string, status = 400) {
     super(message);
     this.status = status;
   }
@@ -134,7 +182,7 @@ function normalizeUsername(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-async function currentUser(request, env) {
+async function currentUser(request: Request, env: Env) {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
   const tokenHash = await digest(token);
@@ -146,7 +194,7 @@ async function currentUser(request, env) {
   `).bind(tokenHash, now).first();
 }
 
-async function createSession(userId, request, env) {
+async function createSession(userId: string, request: Request, env: Env) {
   const rawToken = base64url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await digest(rawToken);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString();
@@ -169,21 +217,21 @@ function routePath(request) {
   return new URL(request.url).pathname.replace(/\/+$/u, "") || "/";
 }
 
-async function getAirports(db) {
-  const result = await db.prepare("SELECT code,name,description,aliases_json FROM airports ORDER BY code").all();
+async function getAirports(db: D1Database) {
+  const result = await db.prepare("SELECT code,name,description,aliases_json FROM airports ORDER BY code").all<AirportRow>();
   return result.results.map((row) => ({ ...row, aliases: JSON.parse(row.aliases_json) }));
 }
 
-async function availableJourneys(db, { date, from, to, passengers = 1 }) {
-  const scheduleResult = await db.prepare("SELECT * FROM flights WHERE active=1 ORDER BY airline,flight_no").all();
+async function availableJourneys(db: D1Database, { date, from, to, passengers = 1 }) {
+  const scheduleResult = await db.prepare("SELECT * FROM flights WHERE active=1 ORDER BY airline,flight_no").all<FlightRow>();
   const weekday = dateDay(date);
   const active = scheduleResult.results
     .map((row) => ({ ...row, days: JSON.parse(row.operating_days_json), segments: JSON.parse(row.segments_json) }))
     .filter((flight) => flight.days.includes(weekday));
   if (!active.length) return [];
 
-  const inventoryResult = await db.prepare("SELECT flight_id,segment_index,capacity,reserved FROM seat_inventory WHERE flight_date=?").bind(date).all();
-  const inventory = new Map(inventoryResult.results.map((row) => [`${row.flight_id}:${row.segment_index}`, row]));
+  const inventoryResult = await db.prepare("SELECT flight_id,segment_index,capacity,reserved FROM seat_inventory WHERE flight_date=?").bind(date).all<InventoryRow>();
+  const inventory = new Map<string, InventoryRow>(inventoryResult.results.map((row) => [`${row.flight_id}:${row.segment_index}`, row]));
   const legs = [];
 
   for (const flight of active) {
@@ -262,7 +310,7 @@ async function availableJourneys(db, { date, from, to, passengers = 1 }) {
     }));
 }
 
-function milesForJourney(journey, flightMap, cabinClass) {
+function milesForJourney(journey, flightMap: Map<string, FlightRow>, cabinClass) {
   let miles = 0;
   for (const leg of journey.legs) {
     const flight = flightMap.get(leg.flightId);
@@ -278,7 +326,7 @@ function milesForJourney(journey, flightMap, cabinClass) {
   return miles;
 }
 
-async function searchFlights(request, env) {
+async function searchFlights(request: Request, env: Env) {
   const params = new URL(request.url).searchParams;
   const date = params.get("date");
   const from = (params.get("from") || "FIA").toUpperCase();
@@ -292,8 +340,8 @@ async function searchFlights(request, env) {
   return json({ journeys, date, from, to, passengers, timezone: "Asia/Singapore" });
 }
 
-async function statusBoard(env, date) {
-  const flights = await env.DB.prepare("SELECT flight_no,airline,segments_json,operating_days_json FROM flights WHERE active=1 ORDER BY flight_no").all();
+async function statusBoard(env: Env, date) {
+  const flights = await env.DB.prepare("SELECT flight_no,airline,segments_json,operating_days_json FROM flights WHERE active=1 ORDER BY flight_no").all<StatusFlightRow>();
   const weekday = dateDay(date);
   const departures = [];
   for (const row of flights.results) {
@@ -308,7 +356,7 @@ async function statusBoard(env, date) {
   return departures;
 }
 
-async function authSignup(request, env) {
+async function authSignup(request: Request, env: Env) {
   const body = await readJson(request);
   const username = safeText(body.username, 20, "Username");
   if (!/^[a-zA-Z0-9_]{3,20}$/u.test(username)) throw new HttpError("Username must be 3–20 letters, numbers, or underscores.");
@@ -332,17 +380,17 @@ async function authSignup(request, env) {
   return json({ user }, 201, { "Set-Cookie": setCookie });
 }
 
-async function authLogin(request, env) {
+async function authLogin(request: Request, env: Env) {
   const body = await readJson(request);
   const username = safeText(body.username, 20, "Username");
   if (typeof body.password !== "string" || body.password.length > 128) throw new HttpError("Wrong password. Or wrong username. We lose track of things.", 401);
   const normalized = normalizeUsername(username);
   const ip = request.headers.get("CF-Connecting-IP") || "local";
   const attemptKey = await digest(`${normalized}\u0000${ip}`);
-  const throttle = await env.DB.prepare("SELECT failed_count,window_started_at,locked_until FROM auth_attempts WHERE attempt_key=?").bind(attemptKey).first();
+  const throttle = await env.DB.prepare("SELECT failed_count,window_started_at,locked_until FROM auth_attempts WHERE attempt_key=?").bind(attemptKey).first<{ failed_count: number; window_started_at: string; locked_until: string | null }>();
   const nowMs = Date.now();
   if (throttle?.locked_until && Date.parse(throttle.locked_until) > nowMs) throw new HttpError("Too many tries. Please wait a little before boarding again.", 429);
-  const user = await env.DB.prepare("SELECT id,username,password_salt,password_hash FROM users WHERE username_normalized=?").bind(normalized).first();
+  const user = await env.DB.prepare("SELECT id,username,password_salt,password_hash FROM users WHERE username_normalized=?").bind(normalized).first<{ id: string; username: string; password_salt: string; password_hash: string }>();
   const salt = user?.password_salt || base64url(new Uint8Array(16));
   const candidate = await hashPassword(body.password, salt);
   if (!user || !equalText(candidate, user.password_hash)) {
@@ -361,13 +409,13 @@ async function authLogin(request, env) {
   return json({ user: profile }, 200, { "Set-Cookie": setCookie });
 }
 
-async function authLogout(request, env) {
+async function authLogout(request: Request, env: Env) {
   const token = cookieValue(request, SESSION_COOKIE);
   if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash=?").bind(await digest(token)).run();
   return json({ ok: true }, 200, { "Set-Cookie": cookieHeader("", 0, new URL(request.url).protocol === "https:") });
 }
 
-async function myBookings(user, env) {
+async function myBookings(user, env: Env) {
   const bookings = await env.DB.prepare(`SELECT id,reference,trip_date,origin_code,destination_code,passenger_name,passenger_count,aircraft,cabin_class,seat_preference,snack_preference,bags,reason,octmiles_earned,status,created_at
     FROM bookings WHERE user_id=? ORDER BY created_at DESC LIMIT 50`).bind(user.id).all();
   const result = [];
@@ -379,7 +427,7 @@ async function myBookings(user, env) {
   return result;
 }
 
-async function createBooking(request, env, user) {
+async function createBooking(request: Request, env: Env, user) {
   const body = await readJson(request);
   const date = body.date;
   const from = typeof body.from === "string" ? body.from.toUpperCase() : "";
@@ -409,18 +457,18 @@ async function createBooking(request, env, user) {
   if (!Array.isArray(body.terms) || !["ceo", "engines", "luggage"].every((term) => body.terms.includes(term))) throw new HttpError("Please tick all three. We need it in writing.");
   if (!Array.isArray(body.flightIds) || body.flightIds.length < 1 || body.flightIds.length > 3 || body.flightIds.some((id) => typeof id !== "string")) throw new HttpError("Choose a flight itinerary first.");
 
-  const todayFlights = await env.DB.prepare("SELECT COUNT(*) AS count FROM bookings WHERE user_id=? AND substr(created_at,1,10)=?").bind(user.id, singaporeDate()).first();
+  const todayFlights = await env.DB.prepare("SELECT COUNT(*) AS count FROM bookings WHERE user_id=? AND substr(created_at,1,10)=?").bind(user.id, singaporeDate()).first<{ count: number }>();
   if (todayFlights.count >= 5) throw new HttpError("Sorry, you have flown too much today.", 429);
   const offered = await availableJourneys(env.DB, { date, from, to, passengers: passengerCount });
   const journey = offered.find((candidate) => candidate.legs.map((leg) => leg.flightId).join("|") === body.flightIds.join("|"));
   if (!journey) throw new HttpError("That itinerary changed or sold out. Search again before confirming.", 409);
 
-  const flightRows = await env.DB.prepare("SELECT * FROM flights WHERE active=1").all();
-  const flightMap = new Map(flightRows.results.map((row) => [row.id, row]));
+  const flightRows = await env.DB.prepare("SELECT * FROM flights WHERE active=1").all<FlightRow>();
+  const flightMap = new Map<string, FlightRow>(flightRows.results.map((row) => [row.id, row]));
   let miles = milesForJourney(journey, flightMap, cabinClass);
   let joelmobileEarned = false;
   if (body.joelmobile === true) {
-    const rideCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM miles_ledger WHERE user_id=? AND event_type='joelmobile_ride' AND substr(created_at,1,10)=?").bind(user.id, new Date().toISOString().slice(0, 10)).first();
+    const rideCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM miles_ledger WHERE user_id=? AND event_type='joelmobile_ride' AND substr(created_at,1,10)=?").bind(user.id, new Date().toISOString().slice(0, 10)).first<{ count: number }>();
     if (rideCount.count < 3) {
       miles += 20;
       joelmobileEarned = true;
@@ -476,13 +524,13 @@ async function createBooking(request, env, user) {
   return json({ booking: created, message: "Confirmed. The boarding pass is fictional; the peanuts are not.", milesEarned: miles }, 201);
 }
 
-async function listReviews(env) {
+async function listReviews(env: Env) {
   const result = await env.DB.prepare(`SELECT r.id,r.rating,r.title,r.body,r.route,r.verified_flyer,r.created_at,u.username
-    FROM reviews r JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 30`).all();
+    FROM reviews r JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 30`).all<ReviewRow>();
   return result.results;
 }
 
-async function saveReview(request, env, user) {
+async function saveReview(request: Request, env: Env, user) {
   const body = await readJson(request);
   const rating = Number(body.rating);
   const title = safeText(body.title, 60, "Title");
@@ -506,7 +554,7 @@ async function saveReview(request, env, user) {
   return json({ review: (await listReviews(env)).find((review) => review.id === id), message: "Thank you! Your review has been placed in the queue. The queue is also delayed." }, 201);
 }
 
-async function updateReview(request, env, user, reviewId, remove = false) {
+async function updateReview(request: Request, env: Env, user, reviewId: string, remove = false) {
   const existing = await env.DB.prepare("SELECT id FROM reviews WHERE id=? AND user_id=?").bind(reviewId, user.id).first();
   if (!existing) throw new HttpError("That review is not on your itinerary.", 404);
   if (remove) {
@@ -522,17 +570,16 @@ async function updateReview(request, env, user, reviewId, remove = false) {
   return json({ review: (await listReviews(env)).find((review) => review.id === reviewId) });
 }
 
-async function trackBaggage(request, env, user) {
+async function trackBaggage(request: Request) {
   const body = await readJson(request);
   const tag = safeText(body.tag, 32, "Baggage tag");
   if (tag.length < 3) throw new HttpError("Baggage tags need at least three characters.");
+  // This is a fictional tracker. Validate the request, then discard the supplied tag.
   const statusText = BAG_MESSAGES[crypto.getRandomValues(new Uint8Array(1))[0] % BAG_MESSAGES.length];
-  const id = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO baggage_requests (id,user_id,tag,status_text) VALUES (?,?,?,?)").bind(id, user?.id || null, tag, statusText).run();
   return json({ status: statusText, progress: 99 });
 }
 
-async function appFetch(request, env) {
+async function appFetch(request: Request, env: Env) {
   const url = new URL(request.url);
   const path = routePath(request);
   const method = request.method.toUpperCase();
@@ -547,7 +594,7 @@ async function appFetch(request, env) {
       return json({ status: "degraded", service: "octee-airlines", database: "unavailable" }, 503);
     }
   }
-  if (!path.startsWith("/api/")) return env.ASSETS.fetch(request);
+  if (!path.startsWith("/api/")) return error("That Octee route is still looking for its gate.", 404);
 
   try {
     if (path === "/api/airports" && method === "GET") return json({ airports: await getAirports(env.DB) });
@@ -591,7 +638,7 @@ async function appFetch(request, env) {
       const id = path.slice("/api/reviews/".length);
       return await updateReview(request, env, user, id, method === "DELETE");
     }
-    if (path === "/api/baggage" && method === "POST") return await trackBaggage(request, env, await currentUser(request, env));
+    if (path === "/api/baggage" && method === "POST") return await trackBaggage(request);
     return error("That Octee route is still looking for its gate.", 404);
   } catch (cause) {
     if (cause instanceof HttpError) return error(cause.message, cause.status);
@@ -600,8 +647,10 @@ async function appFetch(request, env) {
   }
 }
 
-export default {
+const worker: ExportedHandler<Env> = {
   async fetch(request, env) {
     return appFetch(request, env);
   },
 };
+
+export default worker;

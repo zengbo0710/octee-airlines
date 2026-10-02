@@ -1,16 +1,15 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "octee-airlines",
-  "main": "src/index.js",
+  "main": "src/worker/index.ts",
   "compatibility_date": "2026-10-02",
   "workers_dev": true,
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "run_worker_first": true
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
   },
   "d1_databases": [
     {

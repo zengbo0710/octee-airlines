@@ -6,9 +6,9 @@
 - **Application runtime and deployment:** Cloudflare Worker `octee-airlines`, deployed by GitHub Actions with Wrangler.
 - **Persistent database:** Cloudflare D1 database `octee-airlines-db`, bound as `DB`; ID `72f3d11b-1efc-4108-a713-3f0dff849cf6`.
 - **Free app URL:** [`https://octee-airlines.octee.workers.dev`](https://octee-airlines.octee.workers.dev), using the Cloudflare account's `octee` `workers.dev` subdomain.
-- **Target application stack:** React + TypeScript + React Router + Tailwind CSS, built with Vite and Cloudflare's Vite plugin; Cloudflare Workers API; Cloudflare D1 (SQLite) database.
+- **Application stack:** React + TypeScript + React Router + Tailwind CSS, built with Vite and Cloudflare's Vite plugin; Cloudflare Workers API; Cloudflare D1 (SQLite) database.
 - **GitHub Actions secrets:** `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The account token needs D1 Edit for remote migrations and Workers Editor for deployment; keep values out of source control. The account ID must own the bound D1 database.
-- **Data model:** the Worker provides the application UI and JSON API; D1 is the shared source of truth for accounts, sessions, bookings, seat inventory, Octmiles, reviews, redemption codes, and baggage requests. Browser storage is only for temporary form drafts and preferences.
+- **Data model:** the Worker provides the application UI and JSON API; D1 is the shared source of truth for accounts, sessions, bookings, seat inventory, Octmiles, reviews, redemption codes, and audit records. The fictional baggage tracker discards the submitted tag and does not store baggage queries. Browser storage is only for temporary form drafts and preferences.
 - **Hosting rule:** use Cloudflare Workers + D1. Do not deploy this application to GitHub Pages or make it a client-only/localStorage app. GitHub stores source; Cloudflare runs the app and stores its data.
 
 ## 1. Concept
@@ -719,21 +719,22 @@ A second peanut (250, always out of stock) · Priority JOELMOBILE pickup (300) �
 - **Fonts:** system font stack by default; optional Google Fonts must degrade gracefully and may be omitted for privacy/offline use.
 - **Run locally:** `npm ci`, apply migrations to the local D1 database, then `npm run dev` for Vite and the local Worker runtime.
 
-### Stack migration
+### Current implementation
 
-The checked-in first implementation uses browser JavaScript and a Worker entry point in JavaScript. The target stack above is the project standard; migrate that implementation to TypeScript and React as the next frontend foundation change. Keep the existing same-origin Worker API and D1 schema/API contracts during the UI migration. Do not describe the app as a static website: React assets are deployed alongside a Worker that serves dynamic, database-backed routes.
+The application is implemented in React and TypeScript, with the API running in a TypeScript Worker. Keep the same-origin API and D1 contracts stable as the product grows. Do not describe the app as a static website: React assets are deployed alongside a Worker that serves dynamic, database-backed routes.
 
 ```text
 octee-airlines/
 ├── src/
 │   ├── client/
 │   │   ├── main.tsx        React entry point
-│   │   ├── app.tsx          Shared application shell and routes
+│   │   ├── App.tsx          Shared application shell and routes
 │   │   ├── components/     Reusable accessible UI
 │   │   └── styles.css      Tailwind entry point and brand theme
 │   ├── worker/
 │   │   └── index.ts        Worker routes, validation, auth and D1 services
-│   └── shared/             Shared API and domain types
+│   │   ├── types.ts         Typed API and domain contracts
+│   │   └── lib/api.ts       Same-origin API client
 ├── migrations/
 │   ├── 0001_initial.sql   D1 schema and airport/flight seed data
 │   ├── 0002_auth_attempts.sql
@@ -761,7 +762,7 @@ Implemented same-origin endpoints:
 | `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/me` | Account and session lifecycle |
 | `GET /api/bookings`, `POST /api/bookings` | Authenticated trips and atomic seat reservations |
 | `GET /api/reviews`, `POST /api/reviews`, `PATCH/DELETE /api/reviews/:id` | Public reviews and owner edits |
-| `POST /api/baggage` | Fictional tracking result recorded in D1 |
+| `POST /api/baggage` | Fictional tracking result; submitted bag tag is discarded |
 
 Rewards redemption, admin/Control Tower, round-trip/transfer booking, account deletion, and remaining content pages are planned follow-up endpoints. Do not show a UI control for a backend operation until its server-side authorization and validation are implemented.
 
@@ -787,7 +788,7 @@ export const FIA_TAGLINES: Tagline[] = [
 ### Deploying to Cloudflare Workers
 
 1. Push source changes to `main` in [`zengbo0710/octee-airlines`](https://github.com/zengbo0710/octee-airlines).
-2. After the planned frontend migration, GitHub Actions will install the locked dependencies, build with Vite, apply pending D1 migrations to `octee-airlines-db`, then deploy the Worker and frontend assets. Until then, the checked-in workflow deploys the current JavaScript implementation.
+2. GitHub Actions installs locked dependencies, type-checks and builds the React app with Vite, applies pending D1 migrations to `octee-airlines-db`, then deploys the Worker and frontend assets with Wrangler.
 3. Repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` provide deployment credentials. The account token needs D1 Edit to apply migrations and Workers Editor for the Worker; scope it to the Octee resources where Cloudflare permits, and use the account ID that owns the D1 database.
 4. The production app is `https://octee-airlines.octee.workers.dev`. GitHub Pages is not used.
 5. A push does not change Cloudflare data except through an explicit reviewed migration. Never delete or recreate the production D1 database to fix a schema problem.
@@ -798,7 +799,7 @@ export const FIA_TAGLINES: Tagline[] = [
 ## 9. Coding Conventions
 
 - Semantic HTML (`<header>`, `<nav>`, `<main>`, `<section>`, `<footer>`); every page shares the header/footer and app shell components.
-- Type React components, API payloads, and domain models in TypeScript; keep shared contracts under `src/shared/`.
+- Type React components, API payloads, and domain models in TypeScript; keep API/domain contracts in `src/client/types.ts` and Worker-specific environment types with the Worker.
 - Define brand colours and typography in the Tailwind theme in `src/client/styles.css`.
 - Mobile-first, works down to 360px wide with no sideways scrolling.
 - Never render user text as raw HTML; render user-provided content through React's escaped text rendering.
@@ -814,7 +815,7 @@ export const FIA_TAGLINES: Tagline[] = [
 | # | Milestone | Status |
 |---|---|---|
 | M1 | Cloudflare Worker shell, D1 schema, timetable and CI migration/deploy pipeline | Implemented locally; production migration/deploy pending |
-| M2 | Migrate browser UI to React + TypeScript + Tailwind CSS + Vite; establish accessible shared shell, clocks, tagline rotator and airline brand themes | Planned; current first implementation is browser JavaScript |
+| M2 | React + TypeScript + React Router UI, Tailwind/Vite integration, accessible shared shell, clocks, tagline rotator and airline brand themes | Implemented; continue refining page layouts and accessibility |
 | M3 | Home flight search and destination selector | Core search implemented |
 | M4 | D1 timetable, multi-stop search, connection planner and shared seat inventory | Search and inventory implemented; full destination UX planned |
 | M5 | Six-step booking flow, atomic D1 reservation and boarding passes | Basic one-way booking implemented; return trips and six-step progression planned |
@@ -832,7 +833,7 @@ export const FIA_TAGLINES: Tagline[] = [
 
 ## 11. Acceptance Checklist
 
-These are target criteria for the complete application. The checked-in code now implements the dynamic Worker/D1 core and a first booking flow; unchecked items remain planned.
+These are target criteria for the complete application. The checked-in code implements the React UI, dynamic Worker/D1 core and first booking flow; unchecked items remain planned.
 
 - [ ] All 7 FIA taglines appear with the exact line breaks in §3; "at least on this flight" is small
 - [ ] FAG → FIA → Octee shown on About and in the footer
