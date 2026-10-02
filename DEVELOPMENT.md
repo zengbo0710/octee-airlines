@@ -6,7 +6,8 @@
 - **Application runtime and deployment:** Cloudflare Worker `octee-airlines`, deployed by GitHub Actions with Wrangler.
 - **Persistent database:** Cloudflare D1 database `octee-airlines-db`, bound as `DB`; ID `72f3d11b-1efc-4108-a713-3f0dff849cf6`.
 - **Free app URL:** [`https://octee-airlines.octee.workers.dev`](https://octee-airlines.octee.workers.dev), using the Cloudflare account's `octee` `workers.dev` subdomain.
-- **GitHub Actions secrets:** `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token must include Workers Scripts Write and D1 Write for migrations; keep values out of source control.
+- **Target application stack:** React + TypeScript + React Router + Tailwind CSS, built with Vite and Cloudflare's Vite plugin; Cloudflare Workers API; Cloudflare D1 (SQLite) database.
+- **GitHub Actions secrets:** `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The account token needs D1 Edit for remote migrations and Workers Editor for deployment; keep values out of source control. The account ID must own the bound D1 database.
 - **Data model:** the Worker provides the application UI and JSON API; D1 is the shared source of truth for accounts, sessions, bookings, seat inventory, Octmiles, reviews, redemption codes, and baggage requests. Browser storage is only for temporary form drafts and preferences.
 - **Hosting rule:** use Cloudflare Workers + D1. Do not deploy this application to GitHub Pages or make it a client-only/localStorage app. GitHub stores source; Cloudflare runs the app and stores its data.
 
@@ -587,7 +588,7 @@ Search order: OA direct match first, then partner (transfer) match, then FIA, th
 | `--mess-gray` | `#6B7280` | Tiny footnotes |
 
 - Hero banners: a dark-brown to orange gradient with white text. Buttons: orange with dark brown text (readable contrast).
-- **Airline liveries** (tags, flight lists, boarding passes, banners): **Octee Airlines (OA) = orange** `#FF7A00`, **One United (OU) = light blue** `#A8DCF7`, **Scraggy Airlines (SA) = light yellow** `#FFF1A8`, each with dark text for contrast. Tokens `--oa`, `--ou`, `--sa` in `css/styles.css`.
+- **Airline liveries** (tags, flight lists, boarding passes, banners): **Octee Airlines (OA) = orange** `#FF7A00`, **One United (OU) = light blue** `#A8DCF7`, **Scraggy Airlines (SA) = light yellow** `#FFF1A8`, each with dark text for contrast. Tokens `--oa`, `--ou`, `--sa` in `src/client/styles.css`.
 - **Headings:** elegant serif (*Playfair Display*). **Body:** *Inter*. **Departures board:** *JetBrains Mono*, yellow on black.
 
 ### Comedy details (use sparingly)
@@ -708,27 +709,39 @@ A second peanut (250, always out of stock) · Priority JOELMOBILE pickup (300) �
 
 ## 8. Tech Stack & Structure
 
-- **Runtime:** Cloudflare Workers. The Worker serves the app shell/assets and owns the JSON API.
-- **Database:** Cloudflare D1 (SQLite) through the `DB` binding. Database schema changes are numbered SQL migrations under `migrations/`.
-- **Frontend:** accessible HTML, CSS and JavaScript modules served with the Worker. Client code reads/writes application state through same-origin `/api/*`; it is not a standalone GitHub Pages or localStorage product.
-- **Deploy:** GitHub Actions deploys Worker code with Wrangler after applying D1 migrations. The deploy token must include Workers Scripts Write and D1 Write for this database, plus required account read access.
+- **Frontend:** React + TypeScript SPA with React Router for client-side navigation. Use semantic components and call the same-origin `/api/*` endpoints for all shared or account-specific data.
+- **Styling:** Tailwind CSS v4 with shared brand tokens in the Tailwind theme. Keep component markup accessible and mobile-first; use custom CSS only for branded details that utilities do not express cleanly.
+- **Build and local development:** Node.js 24 for local tooling and CI, Vite for builds and hot reload, and `@cloudflare/vite-plugin` so local Worker/API development runs in Cloudflare's Workers runtime. Node.js is not the production server runtime.
+- **Runtime and API:** Cloudflare Workers. The Worker owns authentication, authorization, validation, business rules and the JSON API. Enable Node.js compatibility only if a chosen dependency requires a supported Node API.
+- **Database:** Cloudflare D1 (SQLite) through the `DB` binding. Database schema changes are numbered SQL migrations under `migrations/`; use parameterized SQL and D1 bindings.
+- **Asset hosting:** Vite-built browser assets are deployed with the Worker. This is a dynamic Worker-backed application; the assets are only the UI delivery format. Do not deploy the product to GitHub Pages or make browser storage the source of truth.
+- **Deploy:** GitHub Actions deploys Worker code with Wrangler after applying D1 migrations. The account token needs D1 Edit for migrations and Workers Editor for the Worker, and must belong to the account that owns the database.
 - **Fonts:** system font stack by default; optional Google Fonts must degrade gracefully and may be omitted for privacy/offline use.
-- **Run locally:** `npm ci`, `npx wrangler d1 migrations apply octee-airlines-db --local`, then `npx wrangler dev` → `http://localhost:8787`.
+- **Run locally:** `npm ci`, apply migrations to the local D1 database, then `npm run dev` for Vite and the local Worker runtime.
+
+### Stack migration
+
+The checked-in first implementation uses browser JavaScript and a Worker entry point in JavaScript. The target stack above is the project standard; migrate that implementation to TypeScript and React as the next frontend foundation change. Keep the existing same-origin Worker API and D1 schema/API contracts during the UI migration. Do not describe the app as a static website: React assets are deployed alongside a Worker that serves dynamic, database-backed routes.
 
 ```text
 octee-airlines/
-├── public/
-│   ├── index.html          Worker-served app shell
-│   ├── css/styles.css      Brand tokens and responsive layout
-│   └── js/app.js           Same-origin API client and page interactions
 ├── src/
-│   └── index.js            Worker routes, validation, auth and D1 services
+│   ├── client/
+│   │   ├── main.tsx        React entry point
+│   │   ├── app.tsx          Shared application shell and routes
+│   │   ├── components/     Reusable accessible UI
+│   │   └── styles.css      Tailwind entry point and brand theme
+│   ├── worker/
+│   │   └── index.ts        Worker routes, validation, auth and D1 services
+│   └── shared/             Shared API and domain types
 ├── migrations/
 │   ├── 0001_initial.sql   D1 schema and airport/flight seed data
 │   ├── 0002_auth_attempts.sql
 │   └── 0003_booking_idempotency.sql
+├── index.html              Vite browser entry document
 ├── .github/workflows/deploy.yml
-├── wrangler.jsonc          Worker, assets and D1 binding
+├── vite.config.ts          Vite + Cloudflare Workers integration
+├── wrangler.jsonc          Worker and D1 binding configuration
 ├── package.json
 └── DEVELOPMENT.md         Single development plan (this file)
 ```
@@ -752,11 +765,13 @@ Implemented same-origin endpoints:
 
 Rewards redemption, admin/Control Tower, round-trip/transfer booking, account deletion, and remaining content pages are planned follow-up endpoints. Do not show a UI control for a backend operation until its server-side authorization and validation are implemented.
 
-### Tagline data (`public/js/taglines.js`)
+### Tagline data (typed model example)
 
-```js
+```ts
 // Each line is a separate entry. `punch: true` = punchline styling; `size: "small"` = tiny text.
-export const FIA_TAGLINES = [
+type Tagline = { id: string; lines: { text: string; punch?: boolean; size?: "small" }[] };
+
+export const FIA_TAGLINES: Tagline[] = [
   { id: "fly",     lines: [{ text: "FLY SOMEWHERE." }, { text: "EVENTUALLY", punch: true }] },
   { id: "lost",    lines: [{ text: "LOST? we will make you more lost", punch: true }] },
   { id: "bags",    lines: [{ text: "YOUR BAGS" }, { text: "our mystery", punch: true }] },
@@ -772,8 +787,8 @@ export const FIA_TAGLINES = [
 ### Deploying to Cloudflare Workers
 
 1. Push source changes to `main` in [`zengbo0710/octee-airlines`](https://github.com/zengbo0710/octee-airlines).
-2. GitHub Actions installs the locked Wrangler dependency, applies pending D1 migrations to `octee-airlines-db`, then deploys the Worker.
-3. Repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` provide deployment credentials. The token needs D1 Write to apply migrations and Workers Scripts Write to deploy; scope it to the Octee resources where Cloudflare permits.
+2. After the planned frontend migration, GitHub Actions will install the locked dependencies, build with Vite, apply pending D1 migrations to `octee-airlines-db`, then deploy the Worker and frontend assets. Until then, the checked-in workflow deploys the current JavaScript implementation.
+3. Repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` provide deployment credentials. The account token needs D1 Edit to apply migrations and Workers Editor for the Worker; scope it to the Octee resources where Cloudflare permits, and use the account ID that owns the D1 database.
 4. The production app is `https://octee-airlines.octee.workers.dev`. GitHub Pages is not used.
 5. A push does not change Cloudflare data except through an explicit reviewed migration. Never delete or recreate the production D1 database to fix a schema problem.
 6. Confirm the Actions deployment is green and verify `/health` and the live app after deploy. Roll back application code through Worker version history; handle database rollback with a new forward migration or a verified D1 restore.
@@ -783,9 +798,11 @@ export const FIA_TAGLINES = [
 ## 9. Coding Conventions
 
 - Semantic HTML (`<header>`, `<nav>`, `<main>`, `<section>`, `<footer>`); every page shares the header/footer and app shell components.
-- CSS custom properties for all brand colours (top of `css/styles.css`).
+- Type React components, API payloads, and domain models in TypeScript; keep shared contracts under `src/shared/`.
+- Define brand colours and typography in the Tailwind theme in `src/client/styles.css`.
 - Mobile-first, works down to 360px wide with no sideways scrolling.
-- Never `innerHTML` with user text; use `el()` / `textContent`.
+- Never render user text as raw HTML; render user-provided content through React's escaped text rendering.
+- Keep API requests same-origin and typed; server validation and authorization remain authoritative.
 - Use D1 for shared application state. Restrict browser storage to non-sensitive preferences and short-lived unconfirmed form drafts; never trust it for authorization, bookings, seat counts, or Octmiles.
 - No secrets in the repo: only hashes. No tracking, no external data collection.
 - Commit messages: `feat:`, `fix:`, `style:`, `docs:`.
@@ -797,7 +814,7 @@ export const FIA_TAGLINES = [
 | # | Milestone | Status |
 |---|---|---|
 | M1 | Cloudflare Worker shell, D1 schema, timetable and CI migration/deploy pipeline | Implemented locally; production migration/deploy pending |
-| M2 | Shared responsive shell, clocks, tagline rotator and orange brand system | Core home shell implemented; remaining page layouts planned |
+| M2 | Migrate browser UI to React + TypeScript + Tailwind CSS + Vite; establish accessible shared shell, clocks, tagline rotator and airline brand themes | Planned; current first implementation is browser JavaScript |
 | M3 | Home flight search and destination selector | Core search implemented |
 | M4 | D1 timetable, multi-stop search, connection planner and shared seat inventory | Search and inventory implemented; full destination UX planned |
 | M5 | Six-step booking flow, atomic D1 reservation and boarding passes | Basic one-way booking implemented; return trips and six-step progression planned |
@@ -809,7 +826,7 @@ export const FIA_TAGLINES = [
 | M11 | D1-backed reviews and moderation | Public reviews and account-owned write/edit/delete APIs implemented; moderation planned |
 | M12 | Server-authorized Control Tower | Planned |
 | M13 | Accessibility, security, mobile and reduced-motion acceptance | Initial responsive/accessibility work implemented; full review planned |
-| M14 | Push to GitHub `main`, successful Actions deployment and Cloudflare production verification | Pending |
+| M14 | Push stack changes to GitHub `main`, successful Actions deployment and Cloudflare production verification | Pending |
 
 ---
 
