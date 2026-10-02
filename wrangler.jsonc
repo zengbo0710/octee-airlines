@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "octee-airlines",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-02",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "octee-airlines-db",
+      "database_id": "72f3d11b-1efc-4108-a713-3f0dff849cf6",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
