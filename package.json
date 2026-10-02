@@ -1,0 +1,14 @@
+{
+  "name": "octee-airlines",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply octee-airlines-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply octee-airlines-db --remote",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.146.0"
+  }
+}

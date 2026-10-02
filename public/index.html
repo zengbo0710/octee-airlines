@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff3e6">
+  <meta name="description" content="Octee Airlines: award-winning flights, eventually. Search the shared timetable and book your seat.">
+  <title>Octee Airlines — Fly somewhere. Eventually.</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="Octee Airlines home"><span class="brand-mark">o</span><span>octee<small>Airlines</small></span></a>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav">Menu</button>
+    <nav id="main-nav" aria-label="Main navigation">
+      <a href="#destinations">Destinations</a><a href="#book">Book</a><a href="#status">Flight status</a><a href="#reviews">Reviews</a>
+    </nav>
+    <div class="account-tools"><span id="account-summary">Guest passenger</span><button id="open-account" class="button button-small" type="button">Log in</button><button id="logout" class="button button-small button-quiet hidden" type="button">Log out</button></div>
+  </header>
+
+  <aside class="clock-bar" aria-label="Current time">
+    <span>Your time <time id="local-time">--:--:--</time></span>
+    <span>FIA <time id="fia-time">--:--:--</time></span>
+    <span>SIA <time id="sia-time">--:--:--</time></span>
+  </aside>
+
+  <main>
+    <section id="home" class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Fuji International Airport · A member of FAG</p>
+        <h1 id="tagline"><span>FLY SOMEWHERE.</span><em>EVENTUALLY</em></h1>
+        <p class="hero-intro">The premium airline experience you deserve. The timetable you might get.</p>
+        <a class="button" href="#book">Find your flight <span aria-hidden="true">→</span></a>
+        <p class="fine-print">*award-winning in a category we invented.</p>
+      </div>
+      <div class="hero-stamp" aria-label="Flight schedule from Fuji International Airport"><span>OA</span><strong>FI<span>A</span></strong><small>FLIGHT PLANS<br>ARE SUBJECT TO FLIGHT PLANS</small></div>
+      <div class="hero-sky" aria-hidden="true"><span class="sun"></span><span class="cloud cloud-one"></span><span class="cloud cloud-two"></span><span class="plane">✈</span></div>
+    </section>
+
+    <section id="destinations" class="section section-paper">
+      <div class="section-heading"><div><p class="eyebrow">Route search</p><h2>Where to, eventually?</h2></div><p>Every visitor sees the same live schedule and remaining seats. The database is shared. The excuses are too.</p></div>
+      <form id="search-form" class="search-panel">
+        <label>Flying from<select name="from" id="from-code" required></select></label>
+        <label>Going to<select name="to" id="to-code" required></select></label>
+        <label>Travel date<input type="date" name="date" id="travel-date" required></label>
+        <label>Passengers<select name="passengers" id="passengers"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></label>
+        <button class="button" type="submit">Search flights</button>
+      </form>
+      <p id="search-message" class="status-message" role="status"></p>
+      <div id="flight-results" class="flight-results" aria-live="polite"></div>
+      <div class="destination-grid">
+        <article><span class="airport-code">SIA</span><h3>Scraggy International</h3><p>Transfer hub. Bring your patience and a map.</p></article>
+        <article><span class="airport-code">LIA</span><h3>Lu Pin International</h3><p>About two hours, give or take a day.</p></article>
+        <article><span class="airport-code">SCH</span><h3>Scraggy House</h3><p>New: we land in the garden. Shoes optional.</p></article>
+      </div>
+    </section>
+
+    <section id="book" class="section booking-section">
+      <div class="section-heading"><div><p class="eyebrow">No money will be taken</p><h2>Book a flight</h2></div><p>Choose a result above, complete the passenger details, and confirm. Your booking and seats are saved in Cloudflare D1.</p></div>
+      <div id="booking-empty" class="empty-state">Search the timetable above, then choose a flight to start your booking.</div>
+      <form id="booking-form" class="booking-form hidden">
+        <div id="selected-itinerary" class="selected-itinerary"></div>
+        <div class="form-grid">
+          <label>Passenger name<input name="passengerName" minlength="2" maxlength="80" required autocomplete="name"></label>
+          <label>Aircraft<select name="aircraft"><option>Airbus 777</option><option>Boeing 330</option><option>Airbus 747</option><option>Boeing 380</option><option>Surprise me</option></select></label>
+          <label>Cabin<select name="cabinClass"><option>Octee Economy</option><option>Octee Business</option><option>Octee First</option></select></label>
+          <label>Seat<select name="seatPreference"><option>Somewhere</option><option>Window</option><option>Aisle</option></select></label>
+          <label>Snack<select name="snackPreference"><option>One Peanut</option><option>One Peanut (vegetarian)</option><option>One Peanut (served warm)</option></select></label>
+          <label>Bags<select name="bags"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          <label class="span-all">Reason for travelling<select name="reason"><option>Adventure</option><option>Business, supposedly</option><option>Visiting someone who said “it’s fine”</option><option>To see if the plane works</option></select></label>
+        </div>
+        <label class="check-row"><input name="joelmobile" type="checkbox"> Request a JOELMOBILE pickup at my gate (+20 Octmiles if eligible)</label>
+        <fieldset class="terms"><legend>Three small acknowledgements</legend>
+          <label class="check-row"><input name="terms" type="checkbox" value="ceo" required> I accept Octee to be CEO</label>
+          <label class="check-row"><input name="terms" type="checkbox" value="engines" required> I accept that the engines MAY be working</label>
+          <label class="check-row"><input name="terms" type="checkbox" value="luggage" required> FIA and SIA are not responsible for loss of luggage</label>
+        </fieldset>
+        <div class="form-actions"><button id="cancel-booking" class="button button-quiet" type="button">Choose another flight</button><button class="button" type="submit">Confirm — no money will be taken</button></div>
+        <p id="booking-message" class="status-message" role="status"></p>
+      </form>
+      <div id="booking-confirmation" class="confirmation hidden" role="status"></div>
+    </section>
+
+    <section id="status" class="section status-section">
+      <div class="section-heading"><div><p class="eyebrow">Today at FIA</p><h2>Flight status</h2></div><p>We have several statuses. “On time” is not one of them.</p></div>
+      <div class="board-wrap"><table class="flight-board"><thead><tr><th scope="col">Flight</th><th scope="col">Destination</th><th scope="col">Scheduled</th><th scope="col">Status</th></tr></thead><tbody id="status-rows"><tr><td colspan="4">Checking the board...</td></tr></tbody></table></div>
+    </section>
+
+    <section class="section feature-band">
+      <article><span class="eyebrow">In-flight dining</span><h2>Chef’s selection: one peanut.</h2><p>Served at room temperature. The room is also subject to availability.</p></article>
+      <article><span class="eyebrow">Baggage support</span><h2>Your bags. Our mystery.</h2><form id="baggage-form" class="inline-form"><label class="visually-hidden" for="bag-tag">Baggage tag number</label><input id="bag-tag" name="tag" placeholder="Enter baggage tag" minlength="3" maxlength="32" required><button class="button button-light" type="submit">Track bag</button></form><p id="bag-result" class="fine-print" role="status"></p></article>
+    </section>
+
+    <section id="reviews" class="section section-paper">
+      <div class="section-heading"><div><p class="eyebrow">Passenger reviews</p><h2>We read them. Eventually.</h2></div><p><strong>4.9 ★*</strong><br><small id="actual-average">Actual average is being calculated from the D1 review table.</small></p></div>
+      <div id="review-list" class="review-grid"></div>
+      <form id="review-form" class="review-form hidden">
+        <h3>Leave a review</h3>
+        <label>Rating<select name="rating"><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select></label>
+        <label>Title<input name="title" maxlength="60" required></label>
+        <label>Your review<textarea name="body" minlength="20" maxlength="500" required></textarea></label>
+        <label class="check-row"><input name="acknowledge" type="checkbox" required> This review is about Octee, not my bag</label>
+        <button class="button" type="submit">Submit review</button><p id="review-message" class="status-message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="account" class="section account-section hidden">
+      <div class="section-heading"><div><p class="eyebrow">My Octee</p><h2>Your account</h2></div><p id="miles-summary"></p></div>
+      <h3>My trips</h3><div id="my-trips" class="trip-list"></div>
+    </section>
+
+    <section class="signup-panel" id="account-panel">
+      <button class="modal-close" id="close-account" type="button" aria-label="Close sign in">×</button>
+      <p class="eyebrow">Your account works across devices</p><h2>WHO ARE YOU?<br><span>we also forgot</span></h2>
+      <div class="auth-tabs"><button type="button" data-mode="login" class="active">Log in</button><button type="button" data-mode="signup">Sign up · +100 Octmiles</button></div>
+      <form id="auth-form">
+        <label>Username<input name="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" required></label>
+        <label>Password<input name="password" type="password" minlength="8" autocomplete="current-password" required></label>
+        <label id="confirm-password-label" class="hidden">Confirm password<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password"></label>
+        <p class="fine-print">This is a fictional airline. Don’t reuse an important password.</p>
+        <button class="button" type="submit">Continue</button><p id="auth-message" class="status-message" role="status"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="brand brand-footer"><span class="brand-mark">o</span><span>octee<small>Airlines</small></span></div><p>Octee Airlines, a member of Fuji Airport Group. Operating from Fuji International Airport. Opinions and peanuts are subject to availability.</p><a href="/health" class="health-link">System status</a></footer>
+</body>
+</html>
