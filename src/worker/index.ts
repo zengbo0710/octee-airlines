@@ -1,5 +1,6 @@
 interface Env {
   DB: D1Database;
+  ASSETS: Fetcher;
 }
 
 interface InventoryRow {
@@ -594,7 +595,7 @@ async function appFetch(request: Request, env: Env) {
       return json({ status: "degraded", service: "octee-airlines", database: "unavailable" }, 503);
     }
   }
-  if (!path.startsWith("/api/")) return error("That Octee route is still looking for its gate.", 404);
+  if (!path.startsWith("/api/")) return env.ASSETS.fetch(request);
 
   try {
     if (path === "/api/airports" && method === "GET") return json({ airports: await getAirports(env.DB) });
