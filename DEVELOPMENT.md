@@ -814,7 +814,7 @@ export const FIA_TAGLINES: Tagline[] = [
 
 | # | Milestone | Status |
 |---|---|---|
-| M1 | Cloudflare Worker shell, D1 schema, timetable and CI migration/deploy pipeline | Implemented locally; production migration/deploy pending |
+| M1 | Cloudflare Worker shell, D1 schema, timetable and CI migration/deploy pipeline | Deployed and verified in production |
 | M2 | React + TypeScript + React Router UI, Tailwind/Vite integration, accessible shared shell, clocks, tagline rotator and airline brand themes | Implemented; continue refining page layouts and accessibility |
 | M3 | Home flight search and destination selector | Core search implemented |
 | M4 | D1 timetable, multi-stop search, connection planner and shared seat inventory | Search and inventory implemented; full destination UX planned |
@@ -827,7 +827,7 @@ export const FIA_TAGLINES: Tagline[] = [
 | M11 | D1-backed reviews and moderation | Public reviews and account-owned write/edit/delete APIs implemented; moderation planned |
 | M12 | Server-authorized Control Tower | Planned |
 | M13 | Accessibility, security, mobile and reduced-motion acceptance | Initial responsive/accessibility work implemented; full review planned |
-| M14 | Push stack changes to GitHub `main`, successful Actions deployment and Cloudflare production verification | Pending |
+| M14 | Push stack changes to GitHub `main`, successful Actions deployment and Cloudflare production verification | Complete for React/TypeScript foundation (commit `68a9b9b`); site and D1 health verified |
 
 ---
 
