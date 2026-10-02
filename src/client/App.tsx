@@ -77,7 +77,7 @@ function AccountPanel({
           {mode === "signup" && <label>Confirm password<input name="confirmPassword" type="password" minLength={8} autoComplete="new-password" required /></label>}
           <p className="fine-print">This is a fictional airline. Don’t reuse an important password.</p>
           <button className="button" type="submit" disabled={submitting}>{submitting ? "Checking…" : mode === "signup" ? "Create account · +100 Octmiles" : "Log in"}</button>
-          <p className="status-message" role="status">{message}</p>
+          <p id="auth-message" className={`status-message${message && !message.startsWith("Checking") ? " error" : ""}`} role={message && !message.startsWith("Checking") ? "alert" : "status"} aria-live={message && !message.startsWith("Checking") ? "assertive" : "polite"}>{message}</p>
         </form>
       </section>
     </div>

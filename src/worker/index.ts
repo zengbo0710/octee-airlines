@@ -643,8 +643,12 @@ async function appFetch(request: Request, env: Env) {
     return error("That Octee route is still looking for its gate.", 404);
   } catch (cause) {
     if (cause instanceof HttpError) return error(cause.message, cause.status);
-    console.error("Octee request failed", { path, message: String(cause?.message || cause) });
-    return error("Something went wrong while our engines were being checked.", 500);
+    const reference = request.headers.get("CF-Ray") || crypto.randomUUID();
+    console.error("Octee request failed", { reference, path, message: String(cause?.message || cause) });
+    const message = path === "/api/auth/signup"
+      ? `We couldn't complete sign-up because of a server error. Please try again. If it keeps happening, share reference ${reference}.`
+      : `Something went wrong while our engines were being checked. Reference: ${reference}.`;
+    return error(message, 500);
   }
 }
 
