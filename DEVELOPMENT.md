@@ -10,7 +10,7 @@
 - **D1 database:** `octee-airlines-db` (`72f3d11b-1efc-4108-a713-3f0dff849cf6`), bound as `DB`.
 - **Custom domain:** none configured. A custom domain requires a domain in a Cloudflare zone; use the free `workers.dev` hostname to start.
 
-Cloudflare resources were provisioned through the connected Cloudflare MCP. The Worker is deployed and its free hostname is enabled. The connected GitHub account reports read-only repository permission, so the local workflow/configuration files still need to be pushed by an account owner before GitHub Actions can deploy future `main` updates.
+Cloudflare resources were provisioned through the connected Cloudflare MCP. The Worker is deployed and its free hostname is enabled. The connected GitHub account `zengbo0710` has repository write access. GitHub Actions still needs the Cloudflare secrets listed below before it can deploy future `main` updates.
 
 ## Stack and layout
 
@@ -31,7 +31,7 @@ Keep application logic in the Worker and persist application data in D1 through 
 3. To enable future automated deployments, create a Cloudflare API token scoped to the account used for this Worker, with the Workers edit permission required by Wrangler. Store it in GitHub repository **Settings → Secrets and variables → Actions** as:
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
-4. Ensure the checked-in workflow exists on GitHub and Actions are enabled, then push/merge to `main`. The workflow deploys with Wrangler and the configured free `workers.dev` route.
+4. Ensure GitHub Actions are enabled. Once the workflow is pushed to `main` and the secrets are set, pushes to `main` deploy with Wrangler and the configured free `workers.dev` route.
 
 Do not commit API tokens or other secrets. The checked-in database ID is an identifier, not a credential.
 
